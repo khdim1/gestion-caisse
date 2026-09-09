@@ -67,6 +67,16 @@
     .login-box h1 { text-align: center; margin-bottom: 30px; color: #1a1a2e; }
     .login-box .form-group { margin-bottom: 20px; }
     .login-box .btn-primary { width: 100%; }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid #dee2e6; }
+      .sidebar .nav-btn { flex: 1; text-align: center; border-left: none; border-bottom: 4px solid transparent; padding: 10px; }
+      .sidebar .nav-btn.active { border-bottom-color: #007bff; border-left-color: transparent; }
+      .main { flex-direction: column; }
+      .stats { flex-direction: column; }
+      .header h1 { font-size: 18px; }
+    }
   </style>
 </head>
 <body>
@@ -149,7 +159,7 @@
           </form>
         </div>
 
-        <!-- Retrait -->
+        <!-- Retrait avec code client -->
         <div id="sub-retrait" class="page">
           <h2>💳 Enregistrer un retrait</h2>
           <div id="retrait-msg" class="alert"></div>
@@ -164,7 +174,9 @@
             </div>
             <div class="form-group"><label>Nom du client</label><input type="text" id="retrait-nom" required></div>
             <div class="form-group"><label>Numéro de téléphone</label><input type="tel" id="retrait-telephone" required></div>
-            <!-- Champ ID retrait retiré, généré automatiquement -->
+            <div class="form-group"><label>Code client (4 lettres majuscules)</label>
+              <input type="text" id="retrait-code" maxlength="4" pattern="[A-Z]{4}" required placeholder="EX: ABCD" style="text-transform:uppercase;">
+            </div>
             <button type="submit" class="btn-primary">Enregistrer et générer le reçu</button>
           </form>
         </div>
@@ -175,7 +187,7 @@
           <div id="historique-container"></div>
         </div>
 
-        <!-- Zone d'affichage du reçu (cachée) -->
+        <!-- Zone d'affichage du reçu -->
         <div id="recu-container" style="display:none;"></div>
       </div>
     </div>
@@ -218,14 +230,11 @@
 
     // Afficher une sous-page
     function showPage(pageId) {
-      // Désactiver tous les onglets et pages
       document.querySelectorAll('.sidebar .nav-btn').forEach(b => b.classList.remove('active'));
       Object.values(subPages).forEach(p => p.classList.remove('active'));
-      // Activer celui demandé
       const btn = document.querySelector(`.sidebar .nav-btn[data-page="${pageId}"]`);
       if (btn) btn.classList.add('active');
       if (subPages[pageId]) subPages[pageId].classList.add('active');
-      // Charger les données si nécessaire
       if (pageId === 'dashboard') loadDashboard();
       if (pageId === 'historique') loadHistorique();
     }
@@ -257,7 +266,7 @@
           let details = '';
           if (item.type === 'dépôt') details = `Provenance : ${item.provenance}`;
           else if (item.type === 'dépense') details = `Motif : ${item.motif}`;
-          else if (item.type === 'retrait') details = `Mode : ${item.mode}, Client : ${item.nom_client}, Tél : ${item.telephone}, ID : ${item.id_retrait}`;
+          else if (item.type === 'retrait') details = `Code: ${item.code_client}, Mode: ${item.mode}, Client: ${item.nom_client}, Tél: ${item.telephone}, ID: ${item.id_retrait}`;
           html += `<tr>
             <td>${new Date(item.date_creation).toLocaleString()}</td>
             <td>${item.type}</td>
@@ -273,7 +282,7 @@
       }
     }
 
-    // Afficher un reçu
+    // Afficher un reçu avec code client et bouton de téléchargement PDF
     function showRecu(retrait) {
       const container = document.getElementById('recu-container');
       container.style.display = 'block';
@@ -281,6 +290,7 @@
         <div class="recu no-print">
           <h2>🧾 Reçu de retrait</h2>
           <div class="recu-content">
+            <p><strong>Code client :</strong> ${retrait.code_client}</p>
             <p><strong>ID Retrait :</strong> ${retrait.id_retrait}</p>
             <p><strong>Montant :</strong> ${retrait.montant} FCFA</p>
             <p><strong>Mode :</strong> ${retrait.mode}</p>
@@ -289,7 +299,7 @@
             <p><strong>Date :</strong> ${new Date(retrait.date_creation).toLocaleString()}</p>
           </div>
           <div class="recu-actions">
-            <button onclick="window.print()" class="btn-primary">🖨️ Imprimer</button>
+            <button onclick="window.print()" class="btn-primary">🖨️ Imprimer / Télécharger PDF</button>
             <button onclick="document.getElementById('recu-container').style.display='none'" class="btn-primary" style="background:#6c757d;">Fermer</button>
           </div>
         </div>
@@ -390,11 +400,12 @@
       const mode = document.getElementById('retrait-mode').value;
       const nomClient = document.getElementById('retrait-nom').value;
       const telephone = document.getElementById('retrait-telephone').value;
+      const codeClient = document.getElementById('retrait-code').value.toUpperCase();
       const msg = document.getElementById('retrait-msg');
       try {
         const data = await apiFetch('/api/retraits', {
           method: 'POST',
-          body: JSON.stringify({ montant, mode, nomClient, telephone }) // plus d'idRetrait
+          body: JSON.stringify({ montant, mode, nomClient, telephone, codeClient })
         });
         msg.className = 'alert success';
         msg.textContent = '✅ Retrait enregistré !';
@@ -419,7 +430,6 @@
         pageMain.style.display = 'flex';
         showPage('dashboard');
       } catch (err) {
-        // Non connecté
         pageLogin.style.display = 'flex';
         pageMain.style.display = 'none';
       }

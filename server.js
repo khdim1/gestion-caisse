@@ -4,12 +4,11 @@ const session = require('express-session');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid'); // Pour générer des ID uniques
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 
-// Connexion MySQL
+// Connexion à MySQL (Aiven)
 const pool = mysql.createPool({
   uri: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -38,9 +37,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ===== ROUTES API =====
+// ========== ROUTES API ==========
 
-// Login (avec logs simplifiés)
+// Login
 app.post('/api/login', async (req, res) => {
   const { email, motDePasse } = req.body;
   try {
@@ -57,11 +56,13 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Logout
 app.post('/api/logout', (req, res) => {
   req.session.destroy();
   res.json({ success: true });
 });
 
+// Vérifier session
 app.get('/api/me', requireAuth, (req, res) => {
   res.json({ user: req.session.user });
 });
@@ -119,19 +120,21 @@ app.post('/api/depenses', requireAuth, async (req, res) => {
   }
 });
 
-// Retraits (avec ID auto-généré)
+// Retraits avec code client
 app.post('/api/retraits', requireAuth, async (req, res) => {
-  const { montant, mode, nomClient, telephone } = req.body; // plus d'idRetrait
-  if (!montant || !mode || !nomClient || !telephone) {
+  const { montant, mode, nomClient, telephone, codeClient } = req.body;
+  if (!montant || !mode || !nomClient || !telephone || !codeClient) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
-  // Générer un ID unique au format RET-XXXXXX
-  const idRetrait = `RET-${uuidv4().slice(0, 8).toUpperCase()}`;
+  if (!/^[A-Z]{4}$/.test(codeClient)) {
+    return res.status(400).json({ error: 'Le code client doit être 4 lettres majuscules' });
+  }
   try {
+    const idRetrait = `RET-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const [result] = await pool.query(
-      `INSERT INTO retraits (montant, mode, nom_client, telephone, id_retrait)
-       VALUES (?, ?, ?, ?, ?)`,
-      [parseFloat(montant), mode, nomClient, telephone, idRetrait]
+      `INSERT INTO retraits (montant, mode, nom_client, telephone, id_retrait, code_client)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [parseFloat(montant), mode, nomClient, telephone, idRetrait, codeClient]
     );
     const [newRetrait] = await pool.query('SELECT * FROM retraits WHERE id = ?', [result.insertId]);
     res.json({ success: true, retrait: newRetrait[0] });
@@ -153,13 +156,12 @@ app.get('/api/retraits/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Historique (corrigé)
+// Historique
 app.get('/api/historique', requireAuth, async (req, res) => {
   try {
-    // On sélectionne toutes les colonnes et on ajoute un alias 'type' sans guillemets problématiques
-    const [depots] = await pool.query("SELECT *, 'dépôt' as type FROM depots");
-    const [depenses] = await pool.query("SELECT *, 'dépense' as type FROM depenses");
-    const [retraits] = await pool.query("SELECT *, 'retrait' as type FROM retraits");
+    const [depots] = await pool.query(`SELECT *, 'dépôt' as type FROM depots`);
+    const [depenses] = await pool.query(`SELECT *, 'dépense' as type FROM depenses`);
+    const [retraits] = await pool.query(`SELECT *, 'retrait' as type FROM retraits`);
     const all = [...depots, ...depenses, ...retraits];
     all.sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
     res.json({ historique: all });
