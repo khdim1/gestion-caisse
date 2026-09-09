@@ -120,22 +120,24 @@ app.post('/api/depenses', requireAuth, async (req, res) => {
   }
 });
 
-// Retraits (avec code client et génération auto de l'ID)
+// Retraits (avec code client alphanumérique)
 app.post('/api/retraits', requireAuth, async (req, res) => {
   const { montant, mode, nomClient, telephone, codeClient } = req.body;
   if (!montant || !mode || !nomClient || !telephone || !codeClient) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
-  // Valider codeClient : 4 lettres majuscules
-  if (!/^[A-Z]{4}$/.test(codeClient)) {
-    return res.status(400).json({ error: 'Le code client doit être 4 lettres majuscules' });
+  // Valider codeClient : exactement 4 caractères alphanumériques (lettres ou chiffres)
+  if (!/^[A-Za-z0-9]{4}$/.test(codeClient)) {
+    return res.status(400).json({ error: 'Le code client doit contenir exactement 4 caractères alphanumériques (lettres ou chiffres)' });
   }
+  // Convertir en majuscules pour uniformiser le stockage
+  const codeClientUpper = codeClient.toUpperCase();
   try {
     const idRetrait = `RET-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const [result] = await pool.query(
       `INSERT INTO retraits (montant, mode, nom_client, telephone, id_retrait, code_client)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [parseFloat(montant), mode, nomClient, telephone, idRetrait, codeClient]
+      [parseFloat(montant), mode, nomClient, telephone, idRetrait, codeClientUpper]
     );
     const [newRetrait] = await pool.query('SELECT * FROM retraits WHERE id = ?', [result.insertId]);
     res.json({ success: true, retrait: newRetrait[0] });
@@ -157,7 +159,7 @@ app.get('/api/retraits/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Historique (avec guillemets simples)
+// Historique
 app.get('/api/historique', requireAuth, async (req, res) => {
   try {
     const [depots] = await pool.query(`SELECT *, 'dépôt' as type FROM depots`);

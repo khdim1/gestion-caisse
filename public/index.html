@@ -4,9 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Gestion de Caisse • Premium</title>
-  <!-- Font Awesome 6 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"/>
-  <!-- Google Font (Inter) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet"/>
   <style>
     /* ---------- RESET & BASE ---------- */
@@ -33,7 +31,6 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      transition: all 0.3s ease;
     }
 
     /* ---------- HEADER ---------- */
@@ -102,14 +99,8 @@
       box-shadow: 0 8px 20px rgba(220, 38, 38, 0.25);
     }
 
-    /* ---------- MAIN LAYOUT ---------- */
-    .main {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    /* ---------- SIDEBAR (vertical) ---------- */
+    /* ---------- SIDEBAR ---------- */
+    .main { display: flex; flex: 1; overflow: hidden; }
     .sidebar {
       width: 230px;
       background: rgba(255, 255, 255, 0.3);
@@ -151,9 +142,7 @@
       background: rgba(79, 70, 229, 0.06);
       color: #1e293b;
     }
-    .sidebar .nav-btn:hover i {
-      color: #4f46e5;
-    }
+    .sidebar .nav-btn:hover i { color: #4f46e5; }
     .sidebar .nav-btn.active {
       background: rgba(79, 70, 229, 0.10);
       color: #4f46e5;
@@ -161,9 +150,7 @@
       border-radius: 0 16px 16px 0;
       font-weight: 600;
     }
-    .sidebar .nav-btn.active i {
-      color: #4f46e5;
-    }
+    .sidebar .nav-btn.active i { color: #4f46e5; }
     .sidebar .nav-btn::after {
       content: '';
       position: absolute;
@@ -177,9 +164,7 @@
       opacity: 0;
       transition: 0.25s;
     }
-    .sidebar .nav-btn.active::after {
-      opacity: 1;
-    }
+    .sidebar .nav-btn.active::after { opacity: 1; }
 
     /* ---------- CONTENT ---------- */
     .content {
@@ -250,10 +235,7 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
       transition: 0.3s;
     }
-    .stat-item:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
-    }
+    .stat-item:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06); }
     .stat-item h3 {
       font-size: 13px;
       font-weight: 600;
@@ -324,7 +306,6 @@
       box-shadow: 0 18px 40px rgba(79, 70, 229, 0.4);
     }
     .btn-primary:active { transform: translateY(0); }
-
     .btn-secondary {
       background: rgba(226, 232, 240, 0.6);
       backdrop-filter: blur(4px);
@@ -345,7 +326,6 @@
       transform: translateY(-2px);
       box-shadow: 0 8px 20px rgba(0,0,0,0.04);
     }
-
     .alert {
       padding: 16px 22px;
       border-radius: 20px;
@@ -394,7 +374,6 @@
       background: white;
       box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
@@ -431,7 +410,7 @@
     .badge-depot { background: rgba(209, 250, 229, 0.7); color: #065f46; }
     .badge-depense { background: rgba(254, 226, 226, 0.7); color: #991b1b; }
 
-    /* ---------- REÇU (popup) ---------- */
+    /* ---------- REÇU ---------- */
     .recu-overlay {
       display: none;
       position: fixed;
@@ -471,9 +450,7 @@
       padding-bottom: 18px;
       color: #0f172a;
     }
-    .recu-card h2 i {
-      color: #4f46e5;
-    }
+    .recu-card h2 i { color: #4f46e5; }
     .recu-card .recu-content p {
       margin: 10px 0;
       display: flex;
@@ -521,7 +498,7 @@
     }
     .login-box .btn-primary { width: 100%; justify-content: center; }
 
-    /* ---------- IMPRESSION : seulement le reçu ---------- */
+    /* ---------- IMPRESSION ---------- */
     @media print {
       body, .app-wrapper, .main, .content, .sidebar, .header, .recu-overlay {
         all: initial !important;
@@ -553,19 +530,10 @@
         animation: none !important;
         border-radius: 0 !important;
       }
-      .recu-actions {
-        display: none !important;
-      }
-      .no-print {
-        display: none !important;
-      }
-      .header, .sidebar, .content, .main {
-        display: none !important;
-      }
-      /* Forcer l'affichage du reçu */
-      .recu-overlay .recu-card {
-        display: block !important;
-      }
+      .recu-actions { display: none !important; }
+      .no-print { display: none !important; }
+      .header, .sidebar, .content, .main { display: none !important; }
+      .recu-overlay .recu-card { display: block !important; }
     }
 
     /* ---------- RESPONSIVE ---------- */
@@ -611,9 +579,8 @@
 
   <!-- PAGE PRINCIPALE -->
   <div id="page-main" class="page" style="display:flex; flex-direction:column; height:100%;">
-    <!-- HEADER -->
     <div class="header no-print">
-      <h1><i class="fas fa-wallet"></i> Gestion de Caisse </h1>
+      <h1><i class="fas fa-wallet"></i> Gestion de Caisse • Premium</h1>
       <div class="user-info">
         <span id="user-email"></span>
         <button class="btn-logout" id="logout-btn"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
@@ -621,7 +588,6 @@
     </div>
 
     <div class="main">
-      <!-- SIDEBAR -->
       <div class="sidebar no-print">
         <button class="nav-btn active" data-page="dashboard"><i class="fas fa-chart-pie"></i> <span>Tableau de bord</span></button>
         <button class="nav-btn" data-page="depot"><i class="fas fa-arrow-down"></i> <span>Nouveau dépôt</span></button>
@@ -630,7 +596,6 @@
         <button class="nav-btn" data-page="historique"><i class="fas fa-history"></i> <span>Historique</span></button>
       </div>
 
-      <!-- CONTENT -->
       <div class="content">
         <!-- DASHBOARD -->
         <div id="sub-dashboard" class="page active">
@@ -687,8 +652,9 @@
             </div>
             <div class="form-group"><label>Nom du client</label><input type="text" id="retrait-nom" required></div>
             <div class="form-group"><label>Numéro de téléphone</label><input type="tel" id="retrait-telephone" required></div>
-            <div class="form-group"><label>Code client (4 lettres majuscules)</label>
-              <input type="text" id="retrait-code" maxlength="4" pattern="[A-Z]{4}" required placeholder="EX: ABCD" style="text-transform:uppercase;">
+            <div class="form-group">
+              <label>Code client (libre)</label>
+              <input type="text" id="retrait-code" maxlength="50" placeholder="Entrez un code client (lettres, chiffres, espaces, -, _, .)" style="text-transform:uppercase;">
             </div>
             <button type="submit" class="btn-primary"><i class="fas fa-file-invoice"></i> Enregistrer &amp; générer le reçu</button>
           </form>
@@ -711,14 +677,12 @@
 
 <!-- OVERLAY REÇU -->
 <div id="recu-overlay" class="recu-overlay">
-  <div class="recu-card" id="recu-card">
-    <!-- Contenu injecté par JavaScript -->
-  </div>
+  <div class="recu-card" id="recu-card"></div>
 </div>
 
 <script>
   (function() {
-    // --- Éléments DOM ---
+    // DOM elements
     const pageLogin = document.getElementById('page-login');
     const pageMain = document.getElementById('page-main');
     const loginForm = document.getElementById('login-form');
@@ -741,7 +705,7 @@
     let currentUser = null;
     let historiqueData = [];
 
-    // --- API ---
+    // API
     async function apiFetch(url, options = {}) {
       const res = await fetch(url, {
         ...options,
@@ -753,7 +717,7 @@
       return data;
     }
 
-    // --- Navigation ---
+    // Navigation
     function showPage(pageId) {
       document.querySelectorAll('.sidebar .nav-btn').forEach(b => b.classList.remove('active'));
       Object.values(subPages).forEach(p => p.classList.remove('active'));
@@ -764,7 +728,7 @@
       if (pageId === 'historique') loadHistorique();
     }
 
-    // --- Dashboard ---
+    // Dashboard
     async function loadDashboard() {
       try {
         const data = await apiFetch('/api/dashboard');
@@ -775,7 +739,7 @@
       } catch (err) { console.error(err); }
     }
 
-    // --- Historique ---
+    // Historique
     async function loadHistorique() {
       try {
         const data = await apiFetch('/api/historique');
@@ -836,7 +800,7 @@
       renderHistorique(filtered);
     });
 
-    // --- Reçu ---
+    // Reçu
     window.viewRecu = async function(retraitId) {
       try {
         const data = await apiFetch(`/api/retraits/${retraitId}`);
@@ -871,7 +835,7 @@
       if (e.target === recuOverlay) closeRecu();
     });
 
-    // --- Login ---
+    // Login
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('login-email').value;
@@ -893,7 +857,7 @@
       }
     });
 
-    // --- Logout ---
+    // Logout
     logoutBtn.addEventListener('click', async () => {
       await apiFetch('/api/logout', { method: 'POST' });
       pageMain.style.display = 'none';
@@ -902,12 +866,12 @@
       closeRecu();
     });
 
-    // --- Navigation buttons ---
+    // Navigation
     navBtns.forEach(btn => {
       btn.addEventListener('click', () => showPage(btn.dataset.page));
     });
 
-    // --- Dépôt ---
+    // Dépôt
     document.getElementById('depot-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const montant = document.getElementById('depot-montant').value;
@@ -927,7 +891,7 @@
       }
     });
 
-    // --- Dépense ---
+    // Dépense
     document.getElementById('depense-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const montant = document.getElementById('depense-montant').value;
@@ -947,14 +911,14 @@
       }
     });
 
-    // --- Retrait ---
+    // Retrait
     document.getElementById('retrait-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const montant = document.getElementById('retrait-montant').value;
       const mode = document.getElementById('retrait-mode').value;
       const nomClient = document.getElementById('retrait-nom').value;
       const telephone = document.getElementById('retrait-telephone').value;
-      const codeClient = document.getElementById('retrait-code').value.toUpperCase();
+      const codeClient = document.getElementById('retrait-code').value;
       const msg = document.getElementById('retrait-msg');
       try {
         const data = await apiFetch('/api/retraits', {
@@ -974,7 +938,7 @@
       }
     });
 
-    // --- Vérification session ---
+    // Vérification session
     async function checkSession() {
       try {
         const data = await apiFetch('/api/me');
