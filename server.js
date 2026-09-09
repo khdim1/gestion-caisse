@@ -190,6 +190,60 @@ app.get('/api/historique', requireAuth, async (req, res) => {
   }
 });
 
+// ========== RAPPORTS ==========
+app.get('/api/rapports', requireAuth, async (req, res) => {
+  try {
+    // Agrégation par mois pour les dépôts, dépenses et retraits
+    const [depotsParMois] = await pool.query(`
+      SELECT DATE_FORMAT(date_creation, '%Y-%m') AS mois, SUM(montant) AS total
+      FROM depots
+      GROUP BY mois
+      ORDER BY mois DESC
+    `);
+    const [depensesParMois] = await pool.query(`
+      SELECT DATE_FORMAT(date_creation, '%Y-%m') AS mois, SUM(montant) AS total
+      FROM depenses
+      GROUP BY mois
+      ORDER BY mois DESC
+    `);
+    const [retraitsParMois] = await pool.query(`
+      SELECT DATE_FORMAT(date_creation, '%Y-%m') AS mois, SUM(montant) AS total
+      FROM retraits
+      GROUP BY mois
+      ORDER BY mois DESC
+    `);
+
+    // Totaux globaux
+    const [totalDepots] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depots');
+    const [totalDepenses] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depenses');
+    const [totalRetraits] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM retraits');
+
+    // Nombre d'opérations par type
+    const [countDepots] = await pool.query('SELECT COUNT(*) as count FROM depots');
+    const [countDepenses] = await pool.query('SELECT COUNT(*) as count FROM depenses');
+    const [countRetraits] = await pool.query('SELECT COUNT(*) as count FROM retraits');
+
+    res.json({
+      depotsParMois,
+      depensesParMois,
+      retraitsParMois,
+      totaux: {
+        depots: parseFloat(totalDepots[0].total).toFixed(2),
+        depenses: parseFloat(totalDepenses[0].total).toFixed(2),
+        retraits: parseFloat(totalRetraits[0].total).toFixed(2)
+      },
+      compteurs: {
+        depots: countDepots[0].count,
+        depenses: countDepenses[0].count,
+        retraits: countRetraits[0].count
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Serveur lancé sur http://localhost:${PORT}`);
 });
