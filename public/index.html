@@ -580,7 +580,7 @@
   <!-- PAGE PRINCIPALE -->
   <div id="page-main" class="page" style="display:flex; flex-direction:column; height:100%;">
     <div class="header no-print">
-      <h1><i class="fas fa-wallet"></i> Gestion de Caisse </h1>
+      <h1><i class="fas fa-wallet"></i> Gestion de Caisse • Premium</h1>
       <div class="user-info">
         <span id="user-email"></span>
         <button class="btn-logout" id="logout-btn"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
@@ -653,8 +653,16 @@
             <div class="form-group"><label>Nom du client</label><input type="text" id="retrait-nom" required></div>
             <div class="form-group"><label>Numéro de téléphone</label><input type="tel" id="retrait-telephone" required></div>
             <div class="form-group">
-              <label>Code </label>
-              <input type="text" id="retrait-code" maxlength="50" placeholder="Entrez un code client " style="text-transform:uppercase;">
+              <label>Code client (libre, majuscules automatiques)</label>
+              <input type="text" id="retrait-code" maxlength="50" placeholder="Entrez un code client" style="text-transform:uppercase;">
+            </div>
+            <div class="form-group">
+              <label>Dépositaire</label>
+              <input type="text" id="retrait-depositaire" placeholder="Nom du dépositaire (optionnel)">
+            </div>
+            <div class="form-group">
+              <label>Pays</label>
+              <input type="text" id="retrait-pays" placeholder="Pays (optionnel)">
             </div>
             <button type="submit" class="btn-primary"><i class="fas fa-file-invoice"></i> Enregistrer &amp; générer le reçu</button>
           </form>
@@ -774,7 +782,10 @@
           details = `Motif : ${item.motif}`;
           badge = 'badge-depense';
         } else if (item.type === 'retrait') {
-          details = `Mode : ${item.mode}, Client : ${item.nom_client}, Tél : ${item.telephone}, Code : ${item.code_client || 'N/A'}`;
+          let extra = '';
+          if (item.depositaire) extra += `, Dépositaire : ${item.depositaire}`;
+          if (item.pays) extra += `, Pays : ${item.pays}`;
+          details = `Mode : ${item.mode}, Client : ${item.nom_client}, Tél : ${item.telephone}, Code : ${item.code_client || 'N/A'}${extra}`;
           badge = 'badge-retrait';
         }
         const actionBtn = (item.type === 'retrait' && item.id)
@@ -805,6 +816,9 @@
       try {
         const data = await apiFetch(`/api/retraits/${retraitId}`);
         const r = data.retrait;
+        let extraInfo = '';
+        if (r.depositaire) extraInfo += `<p><strong>Dépositaire :</strong> ${r.depositaire}</p>`;
+        if (r.pays) extraInfo += `<p><strong>Pays :</strong> ${r.pays}</p>`;
         recuCard.innerHTML = `
           <h2><i class="fas fa-receipt"></i> Reçu de retrait</h2>
           <div class="recu-content">
@@ -814,6 +828,7 @@
             <p><strong>Mode :</strong> ${r.mode}</p>
             <p><strong>Client :</strong> ${r.nom_client}</p>
             <p><strong>Téléphone :</strong> ${r.telephone}</p>
+            ${extraInfo}
             <p><strong>Date :</strong> ${new Date(r.date_creation).toLocaleString()}</p>
           </div>
           <div class="recu-actions no-print">
@@ -919,11 +934,13 @@
       const nomClient = document.getElementById('retrait-nom').value;
       const telephone = document.getElementById('retrait-telephone').value;
       const codeClient = document.getElementById('retrait-code').value;
+      const depositaire = document.getElementById('retrait-depositaire').value;
+      const pays = document.getElementById('retrait-pays').value;
       const msg = document.getElementById('retrait-msg');
       try {
         const data = await apiFetch('/api/retraits', {
           method: 'POST',
-          body: JSON.stringify({ montant, mode, nomClient, telephone, codeClient })
+          body: JSON.stringify({ montant, mode, nomClient, telephone, codeClient, depositaire, pays })
         });
         msg.className = 'alert success';
         msg.textContent = '✅ Retrait enregistré !';

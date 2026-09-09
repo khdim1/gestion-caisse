@@ -120,24 +120,40 @@ app.post('/api/depenses', requireAuth, async (req, res) => {
   }
 });
 
-// Retraits (avec code client alphanumérique)
+// Retraits (avec code client flexible, dépositaire, pays)
 app.post('/api/retraits', requireAuth, async (req, res) => {
-  const { montant, mode, nomClient, telephone, codeClient } = req.body;
+  const { montant, mode, nomClient, telephone, codeClient, depositaire, pays } = req.body;
   if (!montant || !mode || !nomClient || !telephone || !codeClient) {
-    return res.status(400).json({ error: 'Tous les champs sont requis' });
+    return res.status(400).json({ error: 'Tous les champs sont requis (montant, mode, nom client, téléphone, code client)' });
   }
-  // Valider codeClient : exactement 4 caractères alphanumériques (lettres ou chiffres)
-  if (!/^[A-Za-z0-9]{4}$/.test(codeClient)) {
-    return res.status(400).json({ error: 'Le code client doit contenir exactement 4 caractères alphanumériques (lettres ou chiffres)' });
+  // Validation du code client : au moins 1 caractère, max 50, caractères autorisés
+  if (!/^[A-Za-z0-9\s\-_.]{1,50}$/.test(codeClient)) {
+    return res.status(400).json({
+      error: 'Le code client peut contenir lettres, chiffres, espaces, tirets, underscores et points (max 50 caractères)'
+    });
   }
-  // Convertir en majuscules pour uniformiser le stockage
-  const codeClientUpper = codeClient.toUpperCase();
+  // Convertir en majuscules
+  const codeClientUpper = codeClient.toUpperCase().trim();
+  // Nettoyer les champs facultatifs (trim)
+  const depositaireClean = depositaire ? depositaire.trim() : null;
+  const paysClean = pays ? pays.trim() : null;
+
   try {
     const idRetrait = `RET-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const [result] = await pool.query(
-      `INSERT INTO retraits (montant, mode, nom_client, telephone, id_retrait, code_client)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [parseFloat(montant), mode, nomClient, telephone, idRetrait, codeClientUpper]
+      `INSERT INTO retraits 
+       (montant, mode, nom_client, telephone, id_retrait, code_client, depositaire, pays)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        parseFloat(montant),
+        mode,
+        nomClient,
+        telephone,
+        idRetrait,
+        codeClientUpper,
+        depositaireClean,
+        paysClean
+      ]
     );
     const [newRetrait] = await pool.query('SELECT * FROM retraits WHERE id = ?', [result.insertId]);
     res.json({ success: true, retrait: newRetrait[0] });
