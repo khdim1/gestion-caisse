@@ -120,12 +120,13 @@ app.post('/api/depenses', requireAuth, async (req, res) => {
   }
 });
 
-// Retraits avec code client
+// Retraits (avec code client et génération auto de l'ID)
 app.post('/api/retraits', requireAuth, async (req, res) => {
   const { montant, mode, nomClient, telephone, codeClient } = req.body;
   if (!montant || !mode || !nomClient || !telephone || !codeClient) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
+  // Valider codeClient : 4 lettres majuscules
   if (!/^[A-Z]{4}$/.test(codeClient)) {
     return res.status(400).json({ error: 'Le code client doit être 4 lettres majuscules' });
   }
@@ -144,7 +145,7 @@ app.post('/api/retraits', requireAuth, async (req, res) => {
   }
 });
 
-// Récupérer un retrait par ID
+// Récupérer un retrait par ID (pour reçu)
 app.get('/api/retraits/:id', requireAuth, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM retraits WHERE id = ?', [req.params.id]);
@@ -156,7 +157,7 @@ app.get('/api/retraits/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Historique
+// Historique (avec guillemets simples)
 app.get('/api/historique', requireAuth, async (req, res) => {
   try {
     const [depots] = await pool.query(`SELECT *, 'dépôt' as type FROM depots`);
