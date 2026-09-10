@@ -8,11 +8,13 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Connexion à MySQL (Aiven)
 const pool = mysql.createPool({
   uri: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
+// Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -30,6 +32,7 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
+// Servir la page principale
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -68,12 +71,12 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
     const resetDepot = resets.find(r => r.type === 'depot');
     const resetRetrait = resets.find(r => r.type === 'retrait');
 
-    // Totaux globaux (toujours calculés pour info)
+    // Totaux globaux
     const [allDepots] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depots');
     const [allDepenses] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depenses');
     const [allRetraits] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM retraits');
 
-    // Totaux depuis le dernier reset
+    // Totaux affichés (depuis le dernier reset)
     let totalDepotsAffiche, totalRetraitsAffiche;
     if (resetDepot) {
       const [r] = await pool.query(
@@ -94,7 +97,6 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       totalRetraitsAffiche = parseFloat(allRetraits[0].total);
     }
 
-    // Solde réel = total global dépôts - dépenses - retraits (indépendant des resets)
     const solde = parseFloat(allDepots[0].total) - parseFloat(allDepenses[0].total) - parseFloat(allRetraits[0].total);
 
     res.json({
@@ -168,8 +170,8 @@ app.post('/api/depenses', requireAuth, async (req, res) => {
 // ========== RETRAITS ==========
 app.post('/api/retraits', requireAuth, async (req, res) => {
   const { montant, mode, nomClient, telephone, codeClient, depositaire, pays } = req.body;
-  if (!montant || !mode || !nomClient || !telephone || !codeClient || !depositaire || !pays) {
-    return res.status(400).json({ error: 'Tous les champs sont requis' });
+  if (!montant || !mode || !nomClient || !telephone || !codeClient) {
+    return res.status(400).json({ error: 'Les champs Montant, Mode, Nom, Téléphone et Code client sont requis' });
   }
   if (!/^[A-Za-z0-9\s\-_.]{1,50}$/.test(codeClient)) {
     return res.status(400).json({
@@ -177,12 +179,15 @@ app.post('/api/retraits', requireAuth, async (req, res) => {
     });
   }
   const codeClientUpper = codeClient.toUpperCase().trim();
+  const depositaireFinal = depositaire ? depositaire.trim() : 'N/A';
+  const paysFinal = pays ? pays.trim() : 'N/A';
+
   try {
     const idRetrait = `RET-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const [result] = await pool.query(
       `INSERT INTO retraits (montant, mode, nom_client, telephone, id_retrait, code_client, depositaire, pays)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [parseFloat(montant), mode, nomClient, telephone, idRetrait, codeClientUpper, depositaire, pays]
+      [parseFloat(montant), mode, nomClient, telephone, idRetrait, codeClientUpper, depositaireFinal, paysFinal]
     );
     const [newRetrait] = await pool.query('SELECT * FROM retraits WHERE id = ?', [result.insertId]);
     res.json({ success: true, retrait: newRetrait[0] });
@@ -218,6 +223,43 @@ app.get('/api/historique', requireAuth, async (req, res) => {
   }
 });
 
+// ========== RAPPORTS ==========
+app.get('/api/rapports', requireAuth, async (req, res) => {
+  try {
+    const [totalDepots] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depots');
+    const [totalDepenses] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depenses');
+    const [totalRetraits] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM retraits');
+
+    const [depotsParMois] = await pool.query(
+      `SELECT DATE_FORMAT(date_creation, '%Y-%m') as mois, SUM(montant) as total
+       FROM depots GROUP BY DATE_FORMAT(date_creation, '%Y-%m') ORDER BY mois`
+    );
+    const [depensesParMois] = await pool.query(
+      `SELECT DATE_FORMAT(date_creation, '%Y-%m') as mois, SUM(montant) as total
+       FROM depenses GROUP BY DATE_FORMAT(date_creation, '%Y-%m') ORDER BY mois`
+    );
+    const [retraitsParMois] = await pool.query(
+      `SELECT DATE_FORMAT(date_creation, '%Y-%m') as mois, SUM(montant) as total
+       FROM retraits GROUP BY DATE_FORMAT(date_creation, '%Y-%m') ORDER BY mois`
+    );
+
+    res.json({
+      totaux: {
+        depots: parseFloat(totalDepots[0].total).toFixed(2),
+        depenses: parseFloat(totalDepenses[0].total).toFixed(2),
+        retraits: parseFloat(totalRetraits[0].total).toFixed(2)
+      },
+      depotsParMois,
+      depensesParMois,
+      retraitsParMois
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ========== DÉMARRAGE ==========
 app.listen(PORT, () => {
   console.log(`Serveur lancé sur http://localhost:${PORT}`);
 });
