@@ -8,13 +8,11 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Connexion à MySQL (Aiven)
 const pool = mysql.createPool({
   uri: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -32,7 +30,6 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-// Servir la page principale
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -63,21 +60,20 @@ app.get('/api/me', requireAuth, (req, res) => {
   res.json({ user: req.session.user });
 });
 
-// ========== DASHBOARD ==========
+// ========== DASHBOARD (avec reset dépenses) ==========
 app.get('/api/dashboard', requireAuth, async (req, res) => {
   try {
-    // Récupérer les dates de reset
     const [resets] = await pool.query('SELECT type, date_reset FROM reset_compteurs');
     const resetDepot = resets.find(r => r.type === 'depot');
+    const resetDepense = resets.find(r => r.type === 'depense');
     const resetRetrait = resets.find(r => r.type === 'retrait');
 
-    // Totaux globaux
     const [allDepots] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depots');
     const [allDepenses] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depenses');
     const [allRetraits] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM retraits');
 
-    // Totaux affichés (depuis le dernier reset)
-    let totalDepotsAffiche, totalRetraitsAffiche;
+    // Total dépôts depuis reset
+    let totalDepotsAffiche;
     if (resetDepot) {
       const [r] = await pool.query(
         'SELECT COALESCE(SUM(montant),0) as total FROM depots WHERE date_creation > ?',
@@ -87,6 +83,21 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
     } else {
       totalDepotsAffiche = parseFloat(allDepots[0].total);
     }
+
+    // Total dépenses depuis reset
+    let totalDepensesAffiche;
+    if (resetDepense) {
+      const [r] = await pool.query(
+        'SELECT COALESCE(SUM(montant),0) as total FROM depenses WHERE date_creation > ?',
+        [resetDepense.date_reset]
+      );
+      totalDepensesAffiche = parseFloat(r[0].total);
+    } else {
+      totalDepensesAffiche = parseFloat(allDepenses[0].total);
+    }
+
+    // Total retraits depuis reset
+    let totalRetraitsAffiche;
     if (resetRetrait) {
       const [r] = await pool.query(
         'SELECT COALESCE(SUM(montant),0) as total FROM retraits WHERE date_creation > ?',
@@ -97,14 +108,16 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       totalRetraitsAffiche = parseFloat(allRetraits[0].total);
     }
 
+    // Solde réel (indépendant des resets)
     const solde = parseFloat(allDepots[0].total) - parseFloat(allDepenses[0].total) - parseFloat(allRetraits[0].total);
 
     res.json({
       solde: solde.toFixed(2),
       totalDepots: totalDepotsAffiche.toFixed(2),
-      totalDepenses: parseFloat(allDepenses[0].total).toFixed(2),
+      totalDepenses: totalDepensesAffiche.toFixed(2),
       totalRetraits: totalRetraitsAffiche.toFixed(2),
       resetDepotDate: resetDepot ? resetDepot.date_reset : null,
+      resetDepenseDate: resetDepense ? resetDepense.date_reset : null,
       resetRetraitDate: resetRetrait ? resetRetrait.date_reset : null
     });
   } catch (err) {
@@ -113,11 +126,11 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
   }
 });
 
-// ========== RESET COMPTEURS ==========
+// ========== RESET COMPTEURS (3 types) ==========
 app.post('/api/reset/:type', requireAuth, async (req, res) => {
   const { type } = req.params;
-  if (!['depot', 'retrait'].includes(type)) {
-    return res.status(400).json({ error: 'Type invalide (depot ou retrait)' });
+  if (!['depot', 'depense', 'retrait'].includes(type)) {
+    return res.status(400).json({ error: 'Type invalide (depot, depense ou retrait)' });
   }
   try {
     const now = new Date();
@@ -259,7 +272,6 @@ app.get('/api/rapports', requireAuth, async (req, res) => {
   }
 });
 
-// ========== DÉMARRAGE ==========
 app.listen(PORT, () => {
   console.log(`Serveur lancé sur http://localhost:${PORT}`);
 });

@@ -654,6 +654,10 @@
             <div class="stat-item">
               <h3>Total dépenses</h3>
               <p id="total-depenses">0.00</p>
+              <button class="btn-reset" onclick="resetCompteur('depense')">
+                <i class="fas fa-redo"></i> Réinitialiser
+              </button>
+              <div class="reset-info" id="reset-depense-info"></div>
             </div>
             <div class="stat-item">
               <h3>Total retraits</h3>
@@ -823,11 +827,18 @@
 
         // Afficher la date de dernier reset
         const infoDepot = document.getElementById('reset-depot-info');
+        const infoDepense = document.getElementById('reset-depense-info');
         const infoRetrait = document.getElementById('reset-retrait-info');
+
         if (data.resetDepotDate) {
           infoDepot.textContent = 'Réinitialisé le ' + new Date(data.resetDepotDate).toLocaleDateString();
         } else {
           infoDepot.textContent = '';
+        }
+        if (data.resetDepenseDate) {
+          infoDepense.textContent = 'Réinitialisé le ' + new Date(data.resetDepenseDate).toLocaleDateString();
+        } else {
+          infoDepense.textContent = '';
         }
         if (data.resetRetraitDate) {
           infoRetrait.textContent = 'Réinitialisé le ' + new Date(data.resetRetraitDate).toLocaleDateString();
@@ -839,7 +850,8 @@
 
     // Réinitialiser un compteur
     window.resetCompteur = async function(type) {
-      const label = type === 'depot' ? 'DÉPÔTS' : 'RETRAITS';
+      const labels = { depot: 'DÉPÔTS', depense: 'DÉPENSES', retrait: 'RETRAITS' };
+      const label = labels[type] || type.toUpperCase();
       if (!confirm(`Êtes-vous sûr de vouloir réinitialiser le total des ${label} ?\n\nLe solde global ne sera pas affecté, seule la somme affichée sera remise à zéro.`)) return;
       try {
         await apiFetch(`/api/reset/${type}`, { method: 'POST' });
