@@ -222,7 +222,7 @@
     }
     .stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 24px;
       margin-bottom: 16px;
     }
@@ -235,6 +235,9 @@
       border: 1px solid rgba(255, 255, 255, 0.7);
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
       transition: 0.3s;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .stat-item:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06); }
     .stat-item h3 {
@@ -249,15 +252,44 @@
       font-size: 30px;
       font-weight: 700;
       color: #0f172a;
+      margin-bottom: 12px;
     }
     .stat-item:nth-child(1) p { color: #16a34a; }
     .stat-item:nth-child(2) p { color: #dc2626; }
     .stat-item:nth-child(3) p { color: #4f46e5; }
 
-    /* ---------- FORMULAIRES ---------- */
-    .form-group {
-      margin-bottom: 24px;
+    /* Bouton reset */
+    .btn-reset {
+      background: rgba(239, 68, 68, 0.08);
+      color: #dc2626;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Inter', sans-serif;
+      align-self: center;
     }
+    .btn-reset:hover {
+      background: #dc2626;
+      color: white;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(220, 38, 38, 0.25);
+    }
+    .reset-info {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 6px;
+      font-style: italic;
+    }
+
+    /* ---------- FORMULAIRES ---------- */
+    .form-group { margin-bottom: 24px; }
     .form-group label {
       display: block;
       font-weight: 600;
@@ -286,6 +318,13 @@
       background: white;
       transform: scale(1.01);
     }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+
     .btn-primary {
       background: linear-gradient(135deg, #4f46e5, #7c3aed);
       color: white;
@@ -300,13 +339,12 @@
       align-items: center;
       gap: 12px;
       box-shadow: 0 12px 28px rgba(79, 70, 229, 0.3);
-      letter-spacing: -0.2px;
+      font-family: 'Inter', sans-serif;
     }
     .btn-primary:hover {
       transform: translateY(-3px);
       box-shadow: 0 18px 40px rgba(79, 70, 229, 0.4);
     }
-    .btn-primary:active { transform: translateY(0); }
     .btn-secondary {
       background: rgba(226, 232, 240, 0.6);
       backdrop-filter: blur(4px);
@@ -321,11 +359,11 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      font-family: 'Inter', sans-serif;
     }
     .btn-secondary:hover {
       background: #e2e8f0;
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.04);
     }
     .alert {
       padding: 16px 22px;
@@ -605,9 +643,26 @@
             <h2>💰 Solde actuel <span id="solde">0.00</span> FCFA</h2>
           </div>
           <div class="stats">
-            <div class="stat-item"><h3>Total dépôts</h3><p id="total-depots">0.00</p></div>
-            <div class="stat-item"><h3>Total dépenses</h3><p id="total-depenses">0.00</p></div>
-            <div class="stat-item"><h3>Total retraits</h3><p id="total-retraits">0.00</p></div>
+            <div class="stat-item">
+              <h3>Total dépôts</h3>
+              <p id="total-depots">0.00</p>
+              <button class="btn-reset" onclick="resetCompteur('depot')">
+                <i class="fas fa-redo"></i> Réinitialiser
+              </button>
+              <div class="reset-info" id="reset-depot-info"></div>
+            </div>
+            <div class="stat-item">
+              <h3>Total dépenses</h3>
+              <p id="total-depenses">0.00</p>
+            </div>
+            <div class="stat-item">
+              <h3>Total retraits</h3>
+              <p id="total-retraits">0.00</p>
+              <button class="btn-reset" onclick="resetCompteur('retrait')">
+                <i class="fas fa-redo"></i> Réinitialiser
+              </button>
+              <div class="reset-info" id="reset-retrait-info"></div>
+            </div>
           </div>
         </div>
 
@@ -765,8 +820,35 @@
         document.getElementById('total-depots').textContent = data.totalDepots;
         document.getElementById('total-depenses').textContent = data.totalDepenses;
         document.getElementById('total-retraits').textContent = data.totalRetraits;
+
+        // Afficher la date de dernier reset
+        const infoDepot = document.getElementById('reset-depot-info');
+        const infoRetrait = document.getElementById('reset-retrait-info');
+        if (data.resetDepotDate) {
+          infoDepot.textContent = 'Réinitialisé le ' + new Date(data.resetDepotDate).toLocaleDateString();
+        } else {
+          infoDepot.textContent = '';
+        }
+        if (data.resetRetraitDate) {
+          infoRetrait.textContent = 'Réinitialisé le ' + new Date(data.resetRetraitDate).toLocaleDateString();
+        } else {
+          infoRetrait.textContent = '';
+        }
       } catch (err) { console.error(err); }
     }
+
+    // Réinitialiser un compteur
+    window.resetCompteur = async function(type) {
+      const label = type === 'depot' ? 'DÉPÔTS' : 'RETRAITS';
+      if (!confirm(`Êtes-vous sûr de vouloir réinitialiser le total des ${label} ?\n\nLe solde global ne sera pas affecté, seule la somme affichée sera remise à zéro.`)) return;
+      try {
+        await apiFetch(`/api/reset/${type}`, { method: 'POST' });
+        alert(`✅ Compteur ${label} réinitialisé avec succès !`);
+        loadDashboard();
+      } catch (err) {
+        alert('Erreur : ' + err.message);
+      }
+    };
 
     // Historique
     async function loadHistorique() {

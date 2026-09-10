@@ -8,13 +8,11 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Connexion à MySQL (Aiven)
 const pool = mysql.createPool({
   uri: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -32,14 +30,11 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-// Servir la page principale
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ========== ROUTES API ==========
-
-// Login
+// ========== AUTH ==========
 app.post('/api/login', async (req, res) => {
   const { email, motDePasse } = req.body;
   try {
@@ -56,29 +51,59 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Logout
 app.post('/api/logout', (req, res) => {
   req.session.destroy();
   res.json({ success: true });
 });
 
-// Vérifier session
 app.get('/api/me', requireAuth, (req, res) => {
   res.json({ user: req.session.user });
 });
 
-// Dashboard
+// ========== DASHBOARD ==========
 app.get('/api/dashboard', requireAuth, async (req, res) => {
   try {
-    const [totalDepots] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depots');
-    const [totalDepenses] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depenses');
-    const [totalRetraits] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM retraits');
-    const solde = totalDepots[0].total - totalDepenses[0].total - totalRetraits[0].total;
+    // Récupérer les dates de reset
+    const [resets] = await pool.query('SELECT type, date_reset FROM reset_compteurs');
+    const resetDepot = resets.find(r => r.type === 'depot');
+    const resetRetrait = resets.find(r => r.type === 'retrait');
+
+    // Totaux globaux (toujours calculés pour info)
+    const [allDepots] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depots');
+    const [allDepenses] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depenses');
+    const [allRetraits] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM retraits');
+
+    // Totaux depuis le dernier reset
+    let totalDepotsAffiche, totalRetraitsAffiche;
+    if (resetDepot) {
+      const [r] = await pool.query(
+        'SELECT COALESCE(SUM(montant),0) as total FROM depots WHERE date_creation > ?',
+        [resetDepot.date_reset]
+      );
+      totalDepotsAffiche = parseFloat(r[0].total);
+    } else {
+      totalDepotsAffiche = parseFloat(allDepots[0].total);
+    }
+    if (resetRetrait) {
+      const [r] = await pool.query(
+        'SELECT COALESCE(SUM(montant),0) as total FROM retraits WHERE date_creation > ?',
+        [resetRetrait.date_reset]
+      );
+      totalRetraitsAffiche = parseFloat(r[0].total);
+    } else {
+      totalRetraitsAffiche = parseFloat(allRetraits[0].total);
+    }
+
+    // Solde réel = total global dépôts - dépenses - retraits (indépendant des resets)
+    const solde = parseFloat(allDepots[0].total) - parseFloat(allDepenses[0].total) - parseFloat(allRetraits[0].total);
+
     res.json({
-      solde: parseFloat(solde).toFixed(2),
-      totalDepots: parseFloat(totalDepots[0].total).toFixed(2),
-      totalDepenses: parseFloat(totalDepenses[0].total).toFixed(2),
-      totalRetraits: parseFloat(totalRetraits[0].total).toFixed(2)
+      solde: solde.toFixed(2),
+      totalDepots: totalDepotsAffiche.toFixed(2),
+      totalDepenses: parseFloat(allDepenses[0].total).toFixed(2),
+      totalRetraits: totalRetraitsAffiche.toFixed(2),
+      resetDepotDate: resetDepot ? resetDepot.date_reset : null,
+      resetRetraitDate: resetRetrait ? resetRetrait.date_reset : null
     });
   } catch (err) {
     console.error(err);
@@ -86,7 +111,27 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
   }
 });
 
-// Dépôts
+// ========== RESET COMPTEURS ==========
+app.post('/api/reset/:type', requireAuth, async (req, res) => {
+  const { type } = req.params;
+  if (!['depot', 'retrait'].includes(type)) {
+    return res.status(400).json({ error: 'Type invalide (depot ou retrait)' });
+  }
+  try {
+    const now = new Date();
+    await pool.query(
+      `INSERT INTO reset_compteurs (type, date_reset) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE date_reset = ?`,
+      [type, now, now]
+    );
+    res.json({ success: true, message: `Compteur ${type} réinitialisé`, date: now });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ========== DÉPÔTS ==========
 app.post('/api/depots', requireAuth, async (req, res) => {
   const { montant, provenance } = req.body;
   if (!montant || !provenance) return res.status(400).json({ error: 'Champs requis' });
@@ -103,7 +148,7 @@ app.post('/api/depots', requireAuth, async (req, res) => {
   }
 });
 
-// Dépenses
+// ========== DÉPENSES ==========
 app.post('/api/depenses', requireAuth, async (req, res) => {
   const { montant, motif } = req.body;
   if (!montant || !motif) return res.status(400).json({ error: 'Champs requis' });
@@ -120,40 +165,24 @@ app.post('/api/depenses', requireAuth, async (req, res) => {
   }
 });
 
-// Retraits (avec code client flexible, dépositaire, pays)
+// ========== RETRAITS ==========
 app.post('/api/retraits', requireAuth, async (req, res) => {
   const { montant, mode, nomClient, telephone, codeClient, depositaire, pays } = req.body;
-  if (!montant || !mode || !nomClient || !telephone || !codeClient) {
-    return res.status(400).json({ error: 'Tous les champs sont requis (montant, mode, nom client, téléphone, code client)' });
+  if (!montant || !mode || !nomClient || !telephone || !codeClient || !depositaire || !pays) {
+    return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
-  // Validation du code client : au moins 1 caractère, max 50, caractères autorisés
   if (!/^[A-Za-z0-9\s\-_.]{1,50}$/.test(codeClient)) {
     return res.status(400).json({
       error: 'Le code client peut contenir lettres, chiffres, espaces, tirets, underscores et points (max 50 caractères)'
     });
   }
-  // Convertir en majuscules
   const codeClientUpper = codeClient.toUpperCase().trim();
-  // Nettoyer les champs facultatifs (trim)
-  const depositaireClean = depositaire ? depositaire.trim() : null;
-  const paysClean = pays ? pays.trim() : null;
-
   try {
     const idRetrait = `RET-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const [result] = await pool.query(
-      `INSERT INTO retraits 
-       (montant, mode, nom_client, telephone, id_retrait, code_client, depositaire, pays)
+      `INSERT INTO retraits (montant, mode, nom_client, telephone, id_retrait, code_client, depositaire, pays)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        parseFloat(montant),
-        mode,
-        nomClient,
-        telephone,
-        idRetrait,
-        codeClientUpper,
-        depositaireClean,
-        paysClean
-      ]
+      [parseFloat(montant), mode, nomClient, telephone, idRetrait, codeClientUpper, depositaire, pays]
     );
     const [newRetrait] = await pool.query('SELECT * FROM retraits WHERE id = ?', [result.insertId]);
     res.json({ success: true, retrait: newRetrait[0] });
@@ -163,7 +192,6 @@ app.post('/api/retraits', requireAuth, async (req, res) => {
   }
 });
 
-// Récupérer un retrait par ID (pour reçu)
 app.get('/api/retraits/:id', requireAuth, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM retraits WHERE id = ?', [req.params.id]);
@@ -175,7 +203,7 @@ app.get('/api/retraits/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Historique
+// ========== HISTORIQUE ==========
 app.get('/api/historique', requireAuth, async (req, res) => {
   try {
     const [depots] = await pool.query(`SELECT *, 'dépôt' as type FROM depots`);
@@ -184,60 +212,6 @@ app.get('/api/historique', requireAuth, async (req, res) => {
     const all = [...depots, ...depenses, ...retraits];
     all.sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
     res.json({ historique: all });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// ========== RAPPORTS ==========
-app.get('/api/rapports', requireAuth, async (req, res) => {
-  try {
-    // Agrégation par mois pour les dépôts, dépenses et retraits
-    const [depotsParMois] = await pool.query(`
-      SELECT DATE_FORMAT(date_creation, '%Y-%m') AS mois, SUM(montant) AS total
-      FROM depots
-      GROUP BY mois
-      ORDER BY mois DESC
-    `);
-    const [depensesParMois] = await pool.query(`
-      SELECT DATE_FORMAT(date_creation, '%Y-%m') AS mois, SUM(montant) AS total
-      FROM depenses
-      GROUP BY mois
-      ORDER BY mois DESC
-    `);
-    const [retraitsParMois] = await pool.query(`
-      SELECT DATE_FORMAT(date_creation, '%Y-%m') AS mois, SUM(montant) AS total
-      FROM retraits
-      GROUP BY mois
-      ORDER BY mois DESC
-    `);
-
-    // Totaux globaux
-    const [totalDepots] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depots');
-    const [totalDepenses] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM depenses');
-    const [totalRetraits] = await pool.query('SELECT COALESCE(SUM(montant),0) as total FROM retraits');
-
-    // Nombre d'opérations par type
-    const [countDepots] = await pool.query('SELECT COUNT(*) as count FROM depots');
-    const [countDepenses] = await pool.query('SELECT COUNT(*) as count FROM depenses');
-    const [countRetraits] = await pool.query('SELECT COUNT(*) as count FROM retraits');
-
-    res.json({
-      depotsParMois,
-      depensesParMois,
-      retraitsParMois,
-      totaux: {
-        depots: parseFloat(totalDepots[0].total).toFixed(2),
-        depenses: parseFloat(totalDepenses[0].total).toFixed(2),
-        retraits: parseFloat(totalRetraits[0].total).toFixed(2)
-      },
-      compteurs: {
-        depots: countDepots[0].count,
-        depenses: countDepenses[0].count,
-        retraits: countRetraits[0].count
-      }
-    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
